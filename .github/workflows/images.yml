@@ -103,8 +103,8 @@ jobs:
                   else:
                       # Stack horizontally: double the width
                       stacked = Image.new("RGBA", (img_first.width, img_first.height * 2))
-                      stacked.paste(img_first, (0, 0))
-                      stacked.paste(img_second, (0, img_first.height))
+                      stacked.paste(img_second, (0, 0))
+                      stacked.paste(img_first, (0, img_second.height))
 
                   t_name = f"{prefix}{str(idx + 1).zfill(2)}.png"
                   output_path = os.path.join(target_dir, t_name)
