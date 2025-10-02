@@ -14,15 +14,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-       
+        
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-       
+        
       - name: Install Pillow
         run: pip install pillow
-       
+        
       - name: Stack consecutive images
         run: |
           python <<'PY'
@@ -62,25 +62,30 @@ jobs:
               if n == 0:
                   return 0
 
-              # Build target pairings according to your rules:
-              # for i in 0..n-1:
-              #   if i is even:  first = s[i],     second = s[i+1]
-              #   if i is odd:   first = s[i+1],   second = s[i]
-              # wrap indices with modulo n
               pairs = []
+              
+              # --- NEW GENERALIZED PAIRING LOGIC START ---
+
               for i in range(n):
                   if i % 2 == 0:
-                      first = images[i]
-                      second = images[(i + 1) % n]
+                      # Even index (0, 2, 4, ...): Pair is (I_i, I_{i+1})
+                      img1_idx = i
+                      img2_idx = (i + 1) % n
                   else:
-                      first = images[(i + 1) % n]
-                      second = images[i]
-                  pairs.append((first, second))
+                      # Odd index (1, 3, 5, ...): Pair is (I_{i+1}, I_i)
+                      img1_idx = (i + 1) % n
+                      img2_idx = i
+                      
+                  pairs.append((images[img1_idx], images[img2_idx]))
+                      
+              # Loop Completion Rule: Append a duplicate of the LAST image if N is odd
+              if n % 2 == 1:
+                  last_image = images[n - 1]
+                  pairs.append((last_image, last_image))
+                  print(f"DEBUG: Appended duplicate pair ({last_image}, {last_image}) to ensure even total count.", file=sys.stderr)
 
-              # If number of pairs is odd, append a duplicate-first frame
-              if len(pairs) % 2 == 1:
-                  pairs.append((images[0], images[0]))
-
+              # --- NEW GENERALIZED PAIRING LOGIC END ---
+              
               # Create stacked images
               for idx, (first_name, second_name) in enumerate(pairs):
                   first_path = os.path.join(source_dir, first_name)
@@ -96,30 +101,32 @@ jobs:
                       )
 
                   if stack_vertical:
-                      # Stack vertically: double the height
+                      # Stack HORIZONTALLY (side by side): double the width
                       stacked = Image.new("RGBA", (img_first.width * 2, img_first.height))
-                      stacked.paste(img_first, (0, 0))
-                      stacked.paste(img_second, (img_first.width, 0))
+                      stacked.paste(img_first, (0, 0)) # Left
+                      stacked.paste(img_second, (img_first.width, 0)) # Right
+                      position_info = f"left: {first_name}, right: {second_name}"
                   else:
-                      # Stack horizontally: double the width
+                      # Stack VERTICALLY (top down): double the height
                       stacked = Image.new("RGBA", (img_first.width, img_first.height * 2))
-                      stacked.paste(img_second, (0, 0))
-                      stacked.paste(img_first, (0, img_second.height))
+                      stacked.paste(img_first, (0, 0)) # Top
+                      stacked.paste(img_second, (0, img_first.height)) # Bottom
+                      position_info = f"top: {first_name}, bottom: {second_name}"
 
                   t_name = f"{prefix}{str(idx + 1).zfill(2)}.png"
                   output_path = os.path.join(target_dir, t_name)
                   stacked.save(output_path)
-                  print(f"Created {t_name}  <- {'left' if stack_vertical else 'top'}: {first_name}, {'right' if stack_vertical else 'bottom'}: {second_name}")
+                  print(f"Created {t_name} <- {position_info}")
 
               return len(pairs)
 
           # Process v images (stack vertically - top and bottom)
-          v_count = process_images(v_images, 'v', stack_vertical=False)
+          v_count = process_images(v_images, 'v', stack_vertical=False) 
           if v_count > 0:
               print(f"Generated {v_count} v-images from {len(v_images)} source v-images")
 
           # Process h images (stack horizontally - side by side)
-          h_count = process_images(h_images, 'h', stack_vertical=True)
+          h_count = process_images(h_images, 'h', stack_vertical=True) 
           if h_count > 0:
               print(f"Generated {h_count} h-images from {len(h_images)} source h-images")
 
@@ -140,7 +147,8 @@ jobs:
               if filename.lower().startswith('h') and filename.lower().endswith('.png'):
                   path = os.path.join(web_dir, filename)
                   with Image.open(path) as img:
-                      rotated = img.rotate(90, expand=True)
+                      # ROTATE 90 degrees Counter ClockWise
+                      rotated = img.rotate(90, expand=True) 
                       rotated.save(path)
                       print(f"Rotated {filename} by 90° CCW")
           PY
@@ -149,7 +157,7 @@ jobs:
         run: |
           echo "Files in Web directory:"
           ls -la Web/ || echo "Web directory not found"
-       
+        
       - name: Commit and push stacked images
         run: |
           git config user.name "github-actions"
