@@ -1,0 +1,53 @@
+name: Cleanup T Images in /Web
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup-t-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+       
+      - name: List current files in Web directory
+        run: |
+          echo "Current files in Web directory:"
+          ls -la Web/ || echo "Web directory not found"
+       
+      - name: Clean up T images
+        run: |
+          if [ -d "Web" ]; then
+            echo "Removing t*.png files from Web directory..."
+            find Web -name "t*.png" -type f -print -delete
+            echo "Cleanup completed"
+          else
+            echo "Web directory does not exist, nothing to clean"
+          fi
+       
+      - name: List files after cleanup
+        run: |
+          echo "Files in Web directory after cleanup:"
+          ls -la Web/ || echo "Web directory not found"
+       
+      - name: Commit and push cleanup
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          
+          echo "Git status before adding:"
+          git status --porcelain
+          
+          git add Web/
+          
+          echo "Git status after adding:"
+          git status --porcelain
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit - no t images were found to remove"
+          else
+            echo "Committing cleanup..."
+            git commit -m "Clean up t*.png files from /Web directory"
+            git push origin main
+            echo "Successfully pushed cleanup to repository"
+          fi
